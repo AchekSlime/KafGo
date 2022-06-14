@@ -1,1 +1,2 @@
-# kafka & go example for "Distributed computing systems" HSE
+## kafka & go 
+## example for "Distributed computing systems" HSE
