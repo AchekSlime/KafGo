@@ -11,32 +11,34 @@ type Producer struct {
 	kafkaProducer *kafka.Producer
 }
 
-func NewProducer() *Producer {
+func NewProducer() (*Producer, error) {
 	fmt.Println("Producer is starting...")
 
 	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": variables.KafkaBootstrapServers})
 	if err != nil {
-		log.Fatalf("Failed to create producer: %s\n", err)
-		//panic(err)
+		return nil, err
 	}
 
 	prd := &Producer{p}
 
 	go prd.deliveryReport()
-	return prd
+	return prd, nil
 }
 
-func (p *Producer) deliveryReport() {
+func (p *Producer) deliveryReport() error {
 	for e := range p.kafkaProducer.Events() {
 		switch ev := e.(type) {
 		case *kafka.Message:
 			if ev.TopicPartition.Error != nil {
-				log.Printf("Delivery failed: %v\n", ev.TopicPartition)
+				// ToDo залогировать ошибку в бесконечном цикле
+				return ev.TopicPartition.Error
 			} else {
 				log.Printf("Delivered message to %v\n", ev.TopicPartition)
 			}
 		}
 	}
+
+	return nil
 }
 
 func (p *Producer) SendMessage(message string) {

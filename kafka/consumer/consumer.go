@@ -13,7 +13,7 @@ type Consumer struct {
 	kafkaConsumer *kafka.Consumer
 }
 
-func NewConsumer(consumerId int, wg *sync.WaitGroup) *Consumer {
+func NewConsumer(consumerId int, wg *sync.WaitGroup) (*Consumer, error) {
 
 	conf := kafka.ConfigMap{
 		"bootstrap.servers": variables.KafkaBootstrapServers,
@@ -23,14 +23,13 @@ func NewConsumer(consumerId int, wg *sync.WaitGroup) *Consumer {
 
 	consumer, err := kafka.NewConsumer(&conf)
 	if err != nil {
-		log.Printf("Failed to create Consumer_%d: %s\n", consumerId, err)
-		panic(err)
+		return nil, err
 	}
 
 	log.Printf("New Consumer_%d is starting...", consumerId)
 
 	wg.Done()
-	return &Consumer{consumerId, consumer}
+	return &Consumer{consumerId, consumer}, nil
 }
 
 func (c *Consumer) SubscribeTopic(topic []string) {
@@ -40,11 +39,12 @@ func (c *Consumer) SubscribeTopic(topic []string) {
 	}
 }
 
-func (c *Consumer) ReadMessage(ch chan string) {
+func (c *Consumer) ReadMessage(ch chan string) error {
 	for {
 		msg, err := c.kafkaConsumer.ReadMessage(-1)
 		if err != nil {
-			log.Printf("Consumer_%d error: %v (%v)\n", c.Id, err, msg)
+			// ToDo залогировать ошибку в бесконечном цикле
+			return err
 		} else {
 			log.Printf("Consumer_%d Message on %s: %s\n", c.Id, msg.TopicPartition, string(msg.Value))
 			ch <- string(msg.Value)
@@ -53,4 +53,5 @@ func (c *Consumer) ReadMessage(ch chan string) {
 
 	c.kafkaConsumer.Close()
 	log.Println("Consumer done")
+	return nil
 }

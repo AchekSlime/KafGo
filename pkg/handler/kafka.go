@@ -18,7 +18,11 @@ var (
 )
 
 func (h *Handler) createProducer(ctx *gin.Context) {
-	prod = producer.NewProducer()
+	prod, err := producer.NewProducer()
+	if err != nil {
+		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"producer": &prod,
@@ -34,7 +38,11 @@ func (h *Handler) createConsumer(ctx *gin.Context) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	cons = consumer.NewConsumer(consumerId, &wg)
+	cons, err = consumer.NewConsumer(consumerId, &wg)
+	if err != nil {
+		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
 	wg.Wait()
 
 	cons.SubscribeTopic([]string{variables.KafkaTopic})
