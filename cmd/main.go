@@ -1,18 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"kafgo/kafka/consumer"
-	"kafgo/kafka/consumer/variables"
-	"kafgo/kafka/producer"
-	"log"
-	"sync"
-	"time"
+	"context"
+	"kafgo"
+	"kafgo/pkg/handler"
+	"kafgo/pkg/logging"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
+	logger := logging.GetLogger()
+	handlers := handler.NewHandler(logger)
 
-	var wg sync.WaitGroup
+	/*var wg sync.WaitGroup
 	wg.Add(1)
 	consumer1 := consumer.NewConsumer(1, &wg)
 	//consumer2 := consumer.NewConsumer(2, &wg)
@@ -45,5 +47,24 @@ func main() {
 
 	for m := range msg {
 		log.Println("Message :", m)
+	}*/
+
+	srv := new(kafgo.Server)
+	go func() {
+		if err := srv.Run("8080", handlers.InitRoutes()); err != nil {
+			logger.Fatalf("error occured while running http server: %s", err.Error())
+		}
+	}()
+
+	logger.Info("server Started")
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	if err := srv.Shutdown(context.Background()); err != nil {
+		logger.Errorf("error occured on server shutting down: %s", err.Error())
 	}
+
+	logger.Info("server Shutting Down")
 }
