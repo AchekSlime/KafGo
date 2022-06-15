@@ -4,16 +4,17 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	_ "github.com/joho/godotenv/autoload"
 	"kafgo/kafka/consumer/variables"
-	"log"
+	"kafgo/pkg/logging"
 	"sync"
 )
 
 type Consumer struct {
 	Id            int
 	kafkaConsumer *kafka.Consumer
+	logger        *logging.Logger
 }
 
-func NewConsumer(consumerId int, wg *sync.WaitGroup) (*Consumer, error) {
+func NewConsumer(consumerId int, wg *sync.WaitGroup, logger *logging.Logger) (*Consumer, error) {
 
 	conf := kafka.ConfigMap{
 		"bootstrap.servers": variables.KafkaBootstrapServers,
@@ -26,13 +27,15 @@ func NewConsumer(consumerId int, wg *sync.WaitGroup) (*Consumer, error) {
 		return nil, err
 	}
 
-	log.Printf("New Consumer_%d is starting...", consumerId)
+	logger.Printf("New Consumer_%d is starting...", consumerId)
 
 	wg.Done()
-	return &Consumer{consumerId, consumer}, nil
+	return &Consumer{consumerId, consumer, logger}, nil
 }
 
 func (c *Consumer) SubscribeTopic(topic []string) {
+	//logger := c.logger.Logger
+
 	err := c.kafkaConsumer.SubscribeTopics(topic, nil)
 	if err != nil {
 		return
@@ -40,18 +43,21 @@ func (c *Consumer) SubscribeTopic(topic []string) {
 }
 
 func (c *Consumer) ReadMessage(ch chan string) error {
+	logger := c.logger.Logger
+
 	for {
 		msg, err := c.kafkaConsumer.ReadMessage(-1)
 		if err != nil {
 			// ToDo залогировать ошибку в бесконечном цикле
 			return err
 		} else {
-			log.Printf("Consumer_%d Message on %s: %s\n", c.Id, msg.TopicPartition, string(msg.Value))
+			logger.Printf("Consumer_%d Message on %s: %s\n", c.Id, msg.TopicPartition, string(msg.Value))
 			ch <- string(msg.Value)
 		}
 	}
 
 	c.kafkaConsumer.Close()
-	log.Println("Consumer done")
+	logger.Println("Consumer done")
+
 	return nil
 }

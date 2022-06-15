@@ -1,31 +1,33 @@
 package producer
 
 import (
-	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafgo/kafka/producer/variables"
-	"log"
+	"kafgo/pkg/logging"
 )
 
 type Producer struct {
 	kafkaProducer *kafka.Producer
+	logger        *logging.Logger
 }
 
-func NewProducer() (*Producer, error) {
-	fmt.Println("Producer is starting...")
+func NewProducer(logger *logging.Logger) (*Producer, error) {
+	logger.Println("Producer is starting...")
 
 	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": variables.KafkaBootstrapServers})
 	if err != nil {
 		return nil, err
 	}
 
-	prd := &Producer{p}
+	prd := &Producer{p, logger}
 
 	go prd.deliveryReport()
 	return prd, nil
 }
 
 func (p *Producer) deliveryReport() error {
+	logger := p.logger.Logger
+
 	for e := range p.kafkaProducer.Events() {
 		switch ev := e.(type) {
 		case *kafka.Message:
@@ -33,7 +35,7 @@ func (p *Producer) deliveryReport() error {
 				// ToDo залогировать ошибку в бесконечном цикле
 				return ev.TopicPartition.Error
 			} else {
-				log.Printf("Delivered message to %v\n", ev.TopicPartition)
+				logger.Printf("Delivered message to %v\n", ev.TopicPartition)
 			}
 		}
 	}
@@ -42,18 +44,19 @@ func (p *Producer) deliveryReport() error {
 }
 
 func (p *Producer) SendMessage(message string) {
+	logger := p.logger.Logger
 
 	err := p.kafkaProducer.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &variables.KafkaTopic, Partition: kafka.PartitionAny},
 		Value:          []byte(message),
 	}, nil)
 	if err != nil {
-		log.Printf("Send message failed: %s", err)
+		logger.Printf("Send message failed: %s", err)
 	}
 	//time.Sleep(3 * time.Second)
 
 	// Wait for message deliveries before shutting down
 	//p.Flush(15 * 1000)
 
-	log.Println("Successfully send message")
+	logger.Println("Successfully send message")
 }
