@@ -6,7 +6,6 @@ import (
 	"kafgo/kafka/consumer"
 	"kafgo/kafka/consumer/variables"
 	"kafgo/kafka/producer"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -18,18 +17,23 @@ var (
 )
 
 func (h *Handler) createProducer(ctx *gin.Context) {
-	prod, err := producer.NewProducer()
+	logger := h.logger.Logger
+
+	var err error
+	prod, err = producer.NewProducer(h.logger)
 	if err != nil {
 		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"producer": &prod,
+		"producer": &logger,
 	})
 }
 
 func (h *Handler) createConsumer(ctx *gin.Context) {
+	logger := h.logger.Logger
+
 	consumerId, err := getId(ctx)
 	if err != nil {
 		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
@@ -38,7 +42,7 @@ func (h *Handler) createConsumer(ctx *gin.Context) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	cons, err = consumer.NewConsumer(consumerId, &wg)
+	cons, err = consumer.NewConsumer(consumerId, &wg, h.logger)
 	if err != nil {
 		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
@@ -48,14 +52,22 @@ func (h *Handler) createConsumer(ctx *gin.Context) {
 	cons.SubscribeTopic([]string{variables.KafkaTopic})
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"consumer": &cons,
+		"consumer": &logger,
 	})
 }
 
 func (h *Handler) postMessage(ctx *gin.Context) {
+	logger := h.logger.Logger
+
 	msg := make(chan string)
 
-	go cons.ReadMessage(msg)
+	go func() {
+		err := cons.ReadMessage(msg)
+		if err != nil {
+			newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}()
 
 	go func() {
 		for i := 0; i < 100; i++ {
@@ -72,6 +84,6 @@ func (h *Handler) postMessage(ctx *gin.Context) {
 	}()
 
 	for m := range msg {
-		log.Println("Message :", m)
+		logger.Println("Message :", m)
 	}
 }
