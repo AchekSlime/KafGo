@@ -9,19 +9,19 @@ import (
 type Producer struct {
 	kafkaProducer *kafka.Producer
 	logger        *logging.Logger
+	Id            int32
 }
 
-func NewProducer(logger *logging.Logger) (*Producer, error) {
-	logger.Println("Producer is starting...")
-
+func NewProducer(producerId int32, logger *logging.Logger) (*Producer, error) {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": variables.KafkaBootstrapServers})
 	if err != nil {
 		return nil, err
 	}
 
-	prd := &Producer{p, logger}
+	prd := &Producer{p, logger, producerId}
 
 	go prd.deliveryReport()
+	logger.Printf("NEW Producer_%d is started...", prd.Id)
 	return prd, nil
 }
 
@@ -32,7 +32,7 @@ func (p *Producer) deliveryReport() error {
 		switch ev := e.(type) {
 		case *kafka.Message:
 			if ev.TopicPartition.Error != nil {
-				// ToDo залогировать ошибку в бесконечном цикле
+				logger.Printf("Delivery err: %v\n", ev.TopicPartition.Error)
 				return ev.TopicPartition.Error
 			} else {
 				logger.Printf("Delivered message to %v\n", ev.TopicPartition)
@@ -43,20 +43,21 @@ func (p *Producer) deliveryReport() error {
 	return nil
 }
 
-func (p *Producer) SendMessage(message string) {
+func (p *Producer) SendMessage(data []byte) {
 	logger := p.logger.Logger
 
 	err := p.kafkaProducer.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &variables.KafkaTopic, Partition: kafka.PartitionAny},
-		Value:          []byte(message),
+		Value:          data,
 	}, nil)
 	if err != nil {
-		logger.Printf("Send message failed: %s", err)
+		logger.Warning("Send message failed: %s", err)
+	} else {
+		logger.Info("Successfully send message")
 	}
 	//time.Sleep(3 * time.Second)
 
 	// Wait for message deliveries before shutting down
 	//p.Flush(15 * 1000)
 
-	logger.Println("Successfully send message")
 }
