@@ -3,10 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"kafgo/kafka/consumer"
-	"log"
 	"net/http"
-	"strconv"
 )
 
 var upGrader = websocket.Upgrader{
@@ -23,40 +20,13 @@ func (h *Handler) connection(ctx *gin.Context) {
 		return
 	}
 
-	_, message, err := ws.ReadMessage()
-	if err != nil {
-		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	id, err := strconv.Atoi(string(message))
-	if err != nil {
-		newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	cons, ok := h.consumers[id]
-	if !ok {
-		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	go read(cons, ws)
+	go h.writing(ws)
 }
 
-func read(cons *consumer.Consumer, conn *websocket.Conn) {
-	msgs := make(chan string)
-	go func() {
-		err := cons.ReadMessage(msgs)
-		if err != nil {
-			log.Println("reading message error: ", err)
-			return
-		}
-	}()
-
+func (h *Handler) writing(conn *websocket.Conn) {
 	for {
 		select {
-		case message := <-msgs:
+		case message := <-h.messageChan:
 			conn.WriteMessage(websocket.TextMessage, []byte(message))
 		}
 	}

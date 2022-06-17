@@ -4,9 +4,11 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-var KafkaBootstrapServers = "localhost:29092"
-var KafkaGroupId = "go-kafka-simple"
-var KafkaTopic = "go-kafka-simple"
+var KafkaBootstrapServers = "kafka:9092"
+
+//var KafkaBootstrapServers = "localhost:29092,localhost:39092"
+var KafkaGroupId = "go-kafka-simple-"
+var KafkaTopic = "Topic1"
 
 //var NumCore = 1
 
